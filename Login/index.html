@@ -33,6 +33,23 @@
                 <p class="form-footer">
                     Don't have an account? <a href="#" id="showSignup">Sign up</a>
                 </p>
+                <p class="forgot-password">
+                    <a href="#" id="showForgotPassword">Forgot Password?</a>
+                </p>
+            </form>
+
+            <!-- Forgot Password Form -->
+            <form id="forgotPasswordForm" class="auth-form hidden">
+                <h2>Reset Password</h2>
+                <p class="form-description">Enter your email address and we'll send you a link to reset your password.</p>
+                <div class="form-group">
+                    <label for="forgotEmail">Email</label>
+                    <input type="email" id="forgotEmail" name="email" required placeholder="Enter your email">
+                </div>
+                <button type="submit" class="btn btn-primary">Send Reset Link</button>
+                <p class="form-footer">
+                    Remember your password? <a href="#" id="showLoginFromForgot">Login</a>
+                </p>
             </form>
 
             <!-- Signup Form (hidden by default) -->
@@ -73,7 +90,6 @@
                 <p id="errorText"></p>
                 <button id="errorButton" class="btn btn-secondary">Try Again</button>
             </div>
-        </div>
     </div>
 
     <!-- Firebase SDKs -->
@@ -86,4 +102,3 @@
     <script src="script.js"></script>
 </body>
 </html>
-

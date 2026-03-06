@@ -1,8 +1,11 @@
 // DOM Elements
 const loginForm = document.getElementById('loginForm');
 const signupForm = document.getElementById('signupForm');
+const forgotPasswordForm = document.getElementById('forgotPasswordForm');
 const showSignup = document.getElementById('showSignup');
 const showLogin = document.getElementById('showLogin');
+const showForgotPassword = document.getElementById('showForgotPassword');
+const showLoginFromForgot = document.getElementById('showLoginFromForgot');
 const successMessage = document.getElementById('successMessage');
 const errorMessage = document.getElementById('errorMessage');
 const successText = document.getElementById('successText');
@@ -26,6 +29,7 @@ function showError(message) {
 function hideAll() {
     loginForm.classList.add('hidden');
     signupForm.classList.add('hidden');
+    forgotPasswordForm.classList.add('hidden');
     successMessage.classList.add('hidden');
     errorMessage.classList.add('hidden');
 }
@@ -38,6 +42,11 @@ function showLoginForm() {
 function showSignupForm() {
     hideAll();
     signupForm.classList.remove('hidden');
+}
+
+function showForgotPasswordForm() {
+    hideAll();
+    forgotPasswordForm.classList.remove('hidden');
 }
 
 // Store user session locally for app access
@@ -61,6 +70,16 @@ showSignup.addEventListener('click', (e) => {
 });
 
 showLogin.addEventListener('click', (e) => {
+    e.preventDefault();
+    showLoginForm();
+});
+
+showForgotPassword.addEventListener('click', (e) => {
+    e.preventDefault();
+    showForgotPasswordForm();
+});
+
+showLoginFromForgot.addEventListener('click', (e) => {
     e.preventDefault();
     showLoginForm();
 });
@@ -122,6 +141,33 @@ loginForm.addEventListener('submit', async (e) => {
             showError('Incorrect password');
         } else {
             showError('Login failed: ' + error.message);
+        }
+    }
+});
+
+// Handle Forgot Password
+forgotPasswordForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const email = document.getElementById('forgotEmail').value.trim();
+
+    if (!email) {
+        showError('Please enter your email address');
+        return;
+    }
+
+    try {
+        // Send password reset email
+        await auth.sendPasswordResetEmail(email);
+        showSuccess('Password reset link sent! Check your email for instructions.');
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        if (error.code === 'auth/invalid-email') {
+            showError('Invalid email address');
+        } else if (error.code === 'auth/user-not-found') {
+            showError('No account found with this email');
+        } else {
+            showError('Failed to send reset link: ' + error.message);
         }
     }
 });
@@ -237,4 +283,3 @@ window.isAuthenticated = function() {
 window.getUser = function() {
     return getCurrentUser() || JSON.parse(sessionStorage.getItem('fitcheck_current_user'));
 };
-
