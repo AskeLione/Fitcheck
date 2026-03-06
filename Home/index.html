@@ -38,14 +38,50 @@
                 </div>
             </div>
             <div style="display: flex; justify-content: center;">
-                <button class="btn btn-small" onclick="checkOutfit()">Check My Outfit</button>
+                <button class="btn btn-small" onclick="checkOutfit()">Suggest Outfit</button>
             </div>
             <div class="result-message" id="resultMessage"></div>
         </div>
 
         <div class="button-row" style="margin-top: 30px; display: flex; gap: 15px; justify-content: center; align-items: center;">
             <button class="btn btn-small" onclick="showUploadSection()">Upload Your Fits</button>
-            <button class="btn btn-small" onclick="removeAllImages()">Remove a Fit</button>
+            <button class="btn btn-small" onclick="showRemoveCategory()">Remove a Fit</button>
+        </div>
+
+        <!-- Remove Category Selection -->
+        <div class="remove-section hidden" id="removeCategorySection">
+            <h2>Select Category to Remove</h2>
+            <div class="clothing-categories">
+                <div class="clothing-item" onclick="showRemoveItems('shirt')">
+                    <div class="icon">👕</div>
+                    <div class="label">Shirt / Top</div>
+                </div>
+                <div class="clothing-item" onclick="showRemoveItems('pants')">
+                    <div class="icon">👖</div>
+                    <div class="label">Pants / Bottoms</div>
+                </div>
+                <div class="clothing-item" onclick="showRemoveItems('shoes')">
+                    <div class="icon">👟</div>
+                    <div class="label">Shoes</div>
+                </div>
+                <div class="clothing-item" onclick="showRemoveItems('accessory')">
+                    <div class="icon">🎒</div>
+                    <div class="label">Accessory</div>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: center; gap: 10px;">
+                <button class="btn btn-small" onclick="closeRemoveSection()">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Remove Items Selection -->
+        <div class="remove-items-section hidden" id="removeItemsSection">
+            <h2 id="removeCategoryTitle">Select Item to Remove</h2>
+            <div class="remove-items-grid" id="removeItemsGrid"></div>
+            <div style="display: flex; justify-content: center; gap: 10px;">
+                <button class="btn btn-small" onclick="showRemoveCategory()">Back</button>
+                <button class="btn btn-small" onclick="closeRemoveSection()">Cancel</button>
+            </div>
         </div>
 
         <div class="upload-section hidden" id="uploadSection">
@@ -71,6 +107,9 @@
                     <div class="icon">🎒</div>
                     <div class="label">Accessory</div>
                 </div>
+            </div>
+            <div style="display: flex; justify-content: center;">
+                <button class="btn btn-small" onclick="closeUploadSection()">Cancel</button>
             </div>
         </div>
     </main>
@@ -105,6 +144,147 @@
         function showUploadSection() {
             const uploadSection = document.getElementById('uploadSection');
             uploadSection.classList.remove('hidden');
+            // Hide remove sections
+            document.getElementById('removeCategorySection').classList.add('hidden');
+            document.getElementById('removeItemsSection').classList.add('hidden');
+            
+            // Clear file inputs
+            const types = ['shirt', 'pants', 'shoes', 'accessory'];
+            types.forEach(type => {
+                const input = document.getElementById(type + 'Input');
+                if (input) {
+                    input.value = '';
+                }
+            });
+        }
+
+        // Show remove category selection
+        function showRemoveCategory() {
+            const user = getCurrentUser();
+            if (!user) return;
+            
+            // Hide other sections
+            document.getElementById('uploadSection').classList.add('hidden');
+            document.getElementById('removeItemsSection').classList.add('hidden');
+            document.getElementById('removeCategorySection').classList.remove('hidden');
+        }
+
+        // Show remove items for selected category
+        async function showRemoveItems(category) {
+            const user = getCurrentUser();
+            if (!user) return;
+
+            const categoryNames = {
+                shirt: 'Shirt / Top',
+                pants: 'Pants / Bottoms',
+                shoes: 'Shoes',
+                accessory: 'Accessory'
+            };
+
+            document.getElementById('removeCategoryTitle').textContent = 'Select ' + categoryNames[category] + ' to Remove';
+            
+            const grid = document.getElementById('removeItemsGrid');
+            grid.innerHTML = '';
+
+            try {
+                // Get all items in this category
+                const snapshot = await db.collection('users').doc(user.uid).collection('outfits')
+                    .where('category', '==', category)
+                    .get();
+
+                if (snapshot.empty) {
+                    grid.innerHTML = '<p style="text-align: center; color: #666;">No items in this category</p>';
+                } else {
+                    snapshot.forEach((doc) => {
+                        const data = doc.data();
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = 'remove-item-card';
+                        itemDiv.onclick = () => removeItem(category, doc.id, data.image);
+                        itemDiv.innerHTML = `
+                            <img src="${data.image}" alt="${category}">
+                            <div class="remove-item-name">${data.name || 'Item'}</div>
+                        `;
+                        grid.appendChild(itemDiv);
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading items:', error);
+                grid.innerHTML = '<p style="text-align: center; color: #666;">Error loading items</p>';
+            }
+
+            document.getElementById('removeCategorySection').classList.add('hidden');
+            document.getElementById('removeItemsSection').classList.remove('hidden');
+        }
+
+        // Remove selected item
+        async function removeItem(category, itemId, imageUrl) {
+            const user = getCurrentUser();
+            if (!user) return;
+
+            if (!confirm('Are you sure you want to remove this item?')) {
+                return;
+            }
+
+            try {
+                // Delete from the individual items collection
+                await db.collection('users').doc(user.uid).collection('outfits').doc(itemId).delete();
+                
+                // Check if this was the current outfit image
+                const currentDoc = await db.collection('users').doc(user.uid).collection('outfits').doc('current').get();
+                
+                if (currentDoc.exists) {
+                    const data = currentDoc.data();
+                    // Check if the removed image is the same as current outfit
+                    if (data[category] === imageUrl) {
+                        // Find another image in the same category or clear it
+                        const snapshot = await db.collection('users').doc(user.uid).collection('outfits')
+                            .where('category', '==', category)
+                            .limit(1)
+                            .get();
+                        
+                        if (!snapshot.empty) {
+                            // Update with next available image
+                            const nextData = snapshot.docs[0].data();
+                            outfitImages[category] = nextData.image;
+                            await db.collection('users').doc(user.uid).collection('outfits').doc('current').set({
+                                [category]: nextData.image,
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }, { merge: true });
+                            // Update preview
+                            const preview = document.getElementById('preview' + category.charAt(0).toUpperCase() + category.slice(1));
+                            preview.innerHTML = '<img src="' + nextData.image + '" alt="' + category + '">';
+                        } else {
+                            // No more items - clear from current
+                            outfitImages[category] = null;
+                            await db.collection('users').doc(user.uid).collection('outfits').doc('current').set({
+                                [category]: firebase.firestore.FieldValue.delete(),
+                                updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                            }, { merge: true });
+                            // Update preview
+                            const preview = document.getElementById('preview' + category.charAt(0).toUpperCase() + category.slice(1));
+                            const placeholders = { shirt: '👕', pants: '👖', shoes: '👟', accessory: '🎒' };
+                            preview.innerHTML = '<span class="placeholder">' + placeholders[category] + '</span>';
+                        }
+                    }
+                }
+
+                alert('Item removed successfully!');
+                showRemoveItems(category); // Refresh the list
+            } catch (error) {
+                console.error('Error removing item:', error);
+                alert('Error removing item. Please try again.');
+            }
+        }
+
+        // Close remove sections
+        function closeRemoveSection() {
+            document.getElementById('removeCategorySection').classList.add('hidden');
+            document.getElementById('removeItemsSection').classList.add('hidden');
+        }
+
+        // Close upload section
+        function closeUploadSection() {
+            document.getElementById('uploadSection').classList.add('hidden');
         }
 
         function removeAllImages() {
@@ -172,12 +352,21 @@
                 const preview = document.getElementById('preview' + type.charAt(0).toUpperCase() + type.slice(1));
                 preview.innerHTML = '<img src="' + base64Image + '" alt="' + type + '">';
 
-                // Save to Firestore
+                // Save to Firestore - save as individual document with category
                 try {
+                    const docRef = await db.collection('users').doc(user.uid).collection('outfits').add({
+                        image: base64Image,
+                        category: type,
+                        name: type + ' ' + Date.now(),
+                        uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    
+                    // Also save to current outfit for preview
                     await db.collection('users').doc(user.uid).collection('outfits').doc('current').set({
                         [type]: base64Image,
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     }, { merge: true });
+                    
                     console.log('Image saved to database');
                 } catch (error) {
                     console.error('Error saving image:', error);

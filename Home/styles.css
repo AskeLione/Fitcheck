@@ -209,6 +209,70 @@ main {
     margin-bottom: 10px;
 }
 
+/* Remove Section */
+.remove-section {
+    background: white;
+    border-radius: 4px;
+    padding: 30px;
+    margin-top: 30px;
+    border: 1px solid #e0e0e0;
+}
+
+.remove-section h2 {
+    color: #333;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+/* Remove Items Section */
+.remove-items-section {
+    background: white;
+    border-radius: 4px;
+    padding: 30px;
+    margin-top: 30px;
+    border: 1px solid #e0e0e0;
+}
+
+.remove-items-section h2 {
+    color: #333;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.remove-items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 15px;
+}
+
+.remove-item-card {
+    border: 2px solid #e0e0e0;
+    border-radius: 4px;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.remove-item-card:hover {
+    border-color: #333;
+    background: #f8f8f8;
+}
+
+.remove-item-card img {
+    width: 100%;
+    height: 120px;
+    object-fit: cover;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+
+.remove-item-name {
+    color: #555;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+
 /* Result Message */
 .result-message {
     margin-top: 20px;
