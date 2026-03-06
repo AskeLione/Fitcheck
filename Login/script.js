@@ -40,42 +40,18 @@ function showSignupForm() {
     signupForm.classList.remove('hidden');
 }
 
-// Get users from localStorage
-function getUsers() {
-    const users = localStorage.getItem('fitcheck_users');
-    return users ? JSON.parse(users) : [];
+// Store user session locally for app access
+function setCurrentUser(user) {
+    localStorage.setItem('fitcheck_current_user', JSON.stringify(user));
 }
 
-// Save users to localStorage
-function saveUsers(users) {
-    localStorage.setItem('fitcheck_users', JSON.stringify(users));
-}
-
-// Get current user from localStorage
 function getCurrentUser() {
     const user = localStorage.getItem('fitcheck_current_user');
     return user ? JSON.parse(user) : null;
 }
 
-// Set current user
-function setCurrentUser(user) {
-    localStorage.setItem('fitcheck_current_user', JSON.stringify(user));
-}
-
-// Clear current user (logout)
 function clearCurrentUser() {
     localStorage.removeItem('fitcheck_current_user');
-}
-
-// Validate email format
-function validateEmail(email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-}
-
-// Validate password strength
-function validatePassword(password) {
-    return password.length >= 6;
 }
 
 // Event Listeners
@@ -90,56 +66,68 @@ showLogin.addEventListener('click', (e) => {
 });
 
 successButton.addEventListener('click', () => {
-    // Redirect to main app or dashboard
-    window.location.href = '../index.html';
+    window.location.href = '../Home/index.html';
 });
 
 errorButton.addEventListener('click', () => {
-    // Go back to login form
     showLoginForm();
 });
 
-// Handle Login
-loginForm.addEventListener('submit', (e) => {
+// Handle Login with Firebase
+loginForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
     const rememberMe = document.getElementById('rememberMe').checked;
 
-    // Validate inputs
     if (!email || !password) {
         showError('Please fill in all fields');
         return;
     }
 
-    if (!validateEmail(email)) {
-        showError('Please enter a valid email address');
-        return;
+    try {
+        // Sign in with Firebase
+        const userCredential = await auth.signInWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+        
+        // Get user data from Firestore
+        const userDoc = await db.collection('users').doc(user.uid).get();
+        
+        if (userDoc.exists) {
+            const userData = userDoc.data();
+            const userInfo = {
+                uid: user.uid,
+                name: userData.name,
+                email: user.email
+            };
+            
+            if (rememberMe) {
+                setCurrentUser(userInfo);
+            } else {
+                sessionStorage.setItem('fitcheck_current_user', JSON.stringify(userInfo));
+            }
+            
+            window.location.href = '../Home/index.html';
+        } else {
+            showError('User data not found');
+        }
+    } catch (error) {
+        console.error('Login error:', error);
+        if (error.code === 'auth/invalid-email') {
+            showError('Invalid email address');
+        } else if (error.code === 'auth/user-not-found') {
+            showError('No account found with this email');
+        } else if (error.code === 'auth/wrong-password') {
+            showError('Incorrect password');
+        } else {
+            showError('Login failed: ' + error.message);
+        }
     }
-
-    // Check if user exists
-    const users = getUsers();
-    const user = users.find(u => u.email === email && u.password === password);
-
-    if (!user) {
-        showError('Invalid email or password. Please try again.');
-        return;
-    }
-
-    // Login successful
-    if (rememberMe) {
-        setCurrentUser(user);
-    } else {
-        // Session only (expires when browser closes)
-        sessionStorage.setItem('fitcheck_current_user', JSON.stringify(user));
-    }
-
-    showSuccess(`Welcome back, ${user.name}!`);
 });
 
-// Handle Signup
-signupForm.addEventListener('submit', (e) => {
+// Handle Signup with Firebase
+signupForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     
     const name = document.getElementById('signupName').value.trim();
@@ -147,7 +135,6 @@ signupForm.addEventListener('submit', (e) => {
     const password = document.getElementById('signupPassword').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
 
-    // Validate inputs
     if (!name || !email || !password || !confirmPassword) {
         showError('Please fill in all fields');
         return;
@@ -158,12 +145,7 @@ signupForm.addEventListener('submit', (e) => {
         return;
     }
 
-    if (!validateEmail(email)) {
-        showError('Please enter a valid email address');
-        return;
-    }
-
-    if (!validatePassword(password)) {
+    if (password.length < 6) {
         showError('Password must be at least 6 characters');
         return;
     }
@@ -173,51 +155,77 @@ signupForm.addEventListener('submit', (e) => {
         return;
     }
 
-    // Check if user already exists
-    const users = getUsers();
-    const existingUser = users.find(u => u.email === email);
-
-    if (existingUser) {
-        showError('An account with this email already exists. Please login.');
-        return;
+    try {
+        // Create user with Firebase
+        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+        const user = userCredential.user;
+        
+        // Save user data to Firestore
+        await db.collection('users').doc(user.uid).set({
+            name: name,
+            email: email,
+            createdAt: firebase.firestore.FieldValue.serverTimestamp()
+        });
+        
+        // Set current user
+        const userInfo = {
+            uid: user.uid,
+            name: name,
+            email: email
+        };
+        
+        setCurrentUser(userInfo);
+        
+        window.location.href = '../Home/index.html';
+    } catch (error) {
+        console.error('Signup error:', error);
+        if (error.code === 'auth/email-already-in-use') {
+            showError('An account with this email already exists');
+        } else if (error.code === 'auth/invalid-email') {
+            showError('Invalid email address');
+        } else if (error.code === 'auth/weak-password') {
+            showError('Password is too weak');
+        } else {
+            showError('Signup failed: ' + error.message);
+        }
     }
-
-    // Create new user
-    const newUser = {
-        id: Date.now(),
-        name: name,
-        email: email,
-        password: password,
-        createdAt: new Date().toISOString()
-    };
-
-    // Save user
-    users.push(newUser);
-    saveUsers(users);
-
-    // Auto login
-    setCurrentUser(newUser);
-
-    showSuccess('Account created successfully! Welcome to Fitcheck!');
 });
 
 // Check if user is already logged in
 function checkAuth() {
-    const currentUser = getCurrentUser();
-    if (currentUser) {
-        // User is logged in, show welcome
-        console.log('User is logged in:', currentUser.name);
-    }
+    auth.onAuthStateChanged(async (firebaseUser) => {
+        if (firebaseUser) {
+            try {
+                const userDoc = await db.collection('users').doc(firebaseUser.uid).get();
+                if (userDoc.exists) {
+                    const userData = userDoc.data();
+                    const userInfo = {
+                        uid: firebaseUser.uid,
+                        name: userData.name,
+                        email: userData.email
+                    };
+                    setCurrentUser(userInfo);
+                }
+            } catch (error) {
+                console.error('Error fetching user data:', error);
+            }
+        }
+    });
 }
 
 // Initialize
 document.addEventListener('DOMContentLoaded', checkAuth);
 
-// Logout function (to be called from other pages)
-window.logout = function() {
+// Logout function
+window.logout = async function() {
+    try {
+        await auth.signOut();
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
     clearCurrentUser();
     sessionStorage.removeItem('fitcheck_current_user');
-    window.location.href = 'Login/index.html';
+    window.location.href = '../Login/index.html';
 };
 
 // Check auth status function

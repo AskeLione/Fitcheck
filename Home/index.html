@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitCheck - Outfit Checker</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header id="header" class="hidden">
+        <div class="logo">FitCheck</div>
+        <div class="user-info">
+            <span class="user-name" id="userName">User</span>
+            <button class="logout-btn" onclick="logout()">Logout</button>
+        </div>
+    </header>
+
+    <main id="mainContent" class="hidden">
+        <div class="welcome">
+            <h1>Welcome to FitCheck!</h1>
+            <p>Upload your outfit and check how it looks!</p>
+        </div>
+
+        <div class="outfit-preview">
+            <h2>Outfit Preview</h2>
+            <div class="outfit-grid">
+                <div class="outfit-item" id="previewShirt">
+                    <span class="placeholder">👕</span>
+                </div>
+                <div class="outfit-item" id="previewPants">
+                    <span class="placeholder">👖</span>
+                </div>
+                <div class="outfit-item" id="previewShoes">
+                    <span class="placeholder">👟</span>
+                </div>
+                <div class="outfit-item" id="previewAccessory">
+                    <span class="placeholder">🎒</span>
+                </div>
+            </div>
+            <div style="display: flex; justify-content: center;">
+                <button class="btn btn-small" onclick="checkOutfit()">Check My Outfit</button>
+            </div>
+            <div class="result-message" id="resultMessage"></div>
+        </div>
+
+        <div class="button-row" style="margin-top: 30px; display: flex; gap: 15px; justify-content: center; align-items: center;">
+            <button class="btn btn-small" onclick="showUploadSection()">Upload Your Fits</button>
+            <button class="btn btn-small" onclick="removeAllImages()">Remove a Fit</button>
+        </div>
+
+        <div class="upload-section hidden" id="uploadSection">
+            <h2>Upload Your Outfit</h2>
+            <div class="clothing-categories">
+                <div class="clothing-item" id="shirtItem" onclick="document.getElementById('shirtInput').click()">
+                    <input type="file" id="shirtInput" accept="image/*" onchange="handleImageUpload(this, 'shirt')">
+                    <div class="icon">👕</div>
+                    <div class="label">Shirt / Top</div>
+                </div>
+                <div class="clothing-item" id="pantsItem" onclick="document.getElementById('pantsInput').click()">
+                    <input type="file" id="pantsInput" accept="image/*" onchange="handleImageUpload(this, 'pants')">
+                    <div class="icon">👖</div>
+                    <div class="label">Pants / Bottoms</div>
+                </div>
+                <div class="clothing-item" id="shoesItem" onclick="document.getElementById('shoesInput').click()">
+                    <input type="file" id="shoesInput" accept="image/*" onchange="handleImageUpload(this, 'shoes')">
+                    <div class="icon">👟</div>
+                    <div class="label">Shoes</div>
+                </div>
+                <div class="clothing-item" id="accessoryItem" onclick="document.getElementById('accessoryInput').click()">
+                    <input type="file" id="accessoryInput" accept="image/*" onchange="handleImageUpload(this, 'accessory')">
+                    <div class="icon">🎒</div>
+                    <div class="label">Accessory</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <div id="authRequired" class="auth-required">
+        <h1>Welcome to FitCheck!</h1>
+        <p>Please login to access your outfit checker</p>
+        <a href="../Login/index.html" class="login-btn">Login / Sign Up</a>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.x.x/firebase-storage-compat.js"></script>
+    
+    <script src="firebase.js"></script>
+    
+    <script>
+        const outfitImages = {
+            shirt: null,
+            pants: null,
+            shoes: null,
+            accessory: null
+        };
+
+        function getCurrentUser() {
+            const user = localStorage.getItem('fitcheck_current_user');
+            return user ? JSON.parse(user) : null;
+        }
+
+        function showUploadSection() {
+            const uploadSection = document.getElementById('uploadSection');
+            uploadSection.classList.remove('hidden');
+        }
+
+        function removeAllImages() {
+            const user = getCurrentUser();
+            if (!user) return;
+
+            // Clear all images locally
+            const types = ['shirt', 'pants', 'shoes', 'accessory'];
+            types.forEach(type => {
+                outfitImages[type] = null;
+                const item = document.getElementById(type + 'Item');
+                item.classList.remove('has-image');
+                const img = item.querySelector('.uploaded-img');
+                if (img) {
+                    img.remove();
+                }
+                const input = document.getElementById(type + 'Input');
+                if (input) {
+                    input.value = '';
+                }
+                const preview = document.getElementById('preview' + type.charAt(0).toUpperCase() + type.slice(1));
+                const placeholders = { shirt: '👕', pants: '👖', shoes: '👟', accessory: '🎒' };
+                preview.innerHTML = '<span class="placeholder">' + placeholders[type] + '</span>';
+            });
+            
+            // Hide result message
+            const resultMessage = document.getElementById('resultMessage');
+            resultMessage.style.display = 'none';
+
+            // Delete from Firestore
+            db.collection('users').doc(user.uid).collection('outfits').doc('current').delete()
+                .then(() => {
+                    console.log('Outfit removed from database');
+                })
+                .catch((error) => {
+                    console.error('Error removing outfit:', error);
+                });
+        }
+
+        async function handleImageUpload(input, type) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const user = getCurrentUser();
+            if (!user) {
+                alert('Please login first');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const base64Image = e.target.result;
+                outfitImages[type] = base64Image;
+
+                // Update UI
+                const item = document.getElementById(type + 'Item');
+                item.classList.add('has-image');
+                let img = item.querySelector('.uploaded-img');
+                if (!img) {
+                    img = document.createElement('img');
+                    img.className = 'uploaded-img';
+                    item.insertBefore(img, item.querySelector('.icon'));
+                }
+                img.src = base64Image;
+                const preview = document.getElementById('preview' + type.charAt(0).toUpperCase() + type.slice(1));
+                preview.innerHTML = '<img src="' + base64Image + '" alt="' + type + '">';
+
+                // Save to Firestore
+                try {
+                    await db.collection('users').doc(user.uid).collection('outfits').doc('current').set({
+                        [type]: base64Image,
+                        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                    console.log('Image saved to database');
+                } catch (error) {
+                    console.error('Error saving image:', error);
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function loadOutfits() {
+            const user = getCurrentUser();
+            if (!user) return;
+
+            try {
+                const doc = await db.collection('users').doc(user.uid).collection('outfits').doc('current').get();
+                if (doc.exists) {
+                    const data = doc.data();
+                    const types = ['shirt', 'pants', 'shoes', 'accessory'];
+                    
+                    types.forEach(type => {
+                        if (data[type]) {
+                            outfitImages[type] = data[type];
+                            
+                            // Update UI
+                            const item = document.getElementById(type + 'Item');
+                            item.classList.add('has-image');
+                            let img = item.querySelector('.uploaded-img');
+                            if (!img) {
+                                img = document.createElement('img');
+                                img.className = 'uploaded-img';
+                                item.insertBefore(img, item.querySelector('.icon'));
+                            }
+                            img.src = data[type];
+                            
+                            const preview = document.getElementById('preview' + type.charAt(0).toUpperCase() + type.slice(1));
+                            preview.innerHTML = '<img src="' + data[type] + '" alt="' + type + '">';
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading outfits:', error);
+            }
+        }
+
+        function checkOutfit() {
+            const resultMessage = document.getElementById('resultMessage');
+            if (!outfitImages.shirt && !outfitImages.pants) {
+                resultMessage.className = 'result-message error';
+                resultMessage.textContent = 'Please upload at least a shirt or pants to check your outfit!';
+                return;
+            }
+            const messages = [
+                'Looking great! Your outfit combo is on point!',
+                'Awesome match! You have a great sense of style!',
+                'Perfect choice! This outfit works well together!',
+                'Love it! Your outfit is fire!',
+                'Great combo! Keep up the good fashion sense!'
+            ];
+            const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+            resultMessage.className = 'result-message success';
+            resultMessage.textContent = randomMessage;
+        }
+
+        function checkAuth() {
+            auth.onAuthStateChanged((firebaseUser) => {
+                const header = document.getElementById('header');
+                const mainContent = document.getElementById('mainContent');
+                const authRequired = document.getElementById('authRequired');
+                const userName = document.getElementById('userName');
+
+                if (firebaseUser) {
+                    const user = getCurrentUser();
+                    if (user) {
+                        header.classList.remove('hidden');
+                        mainContent.classList.remove('hidden');
+                        authRequired.classList.add('hidden');
+                        userName.textContent = 'Hello, ' + user.name + '!';
+                        loadOutfits();
+                    } else {
+                        header.classList.add('hidden');
+                        mainContent.classList.add('hidden');
+                        authRequired.classList.remove('hidden');
+                    }
+                } else {
+                    header.classList.add('hidden');
+                    mainContent.classList.add('hidden');
+                    authRequired.classList.remove('hidden');
+                }
+            });
+        }
+
+        async function logout() {
+            try {
+                await auth.signOut();
+            } catch (error) {
+                console.error('Logout error:', error);
+            }
+            localStorage.removeItem('fitcheck_current_user');
+            sessionStorage.removeItem('fitcheck_current_user');
+            window.location.href = '../Login/index.html';
+        }
+
+        document.addEventListener('DOMContentLoaded', checkAuth);
+    </script>
+</body>
+</html>
+
