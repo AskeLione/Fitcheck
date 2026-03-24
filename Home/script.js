@@ -5,51 +5,54 @@ let pendingDeleteData = null;
 let currentOccasion = "Casual";
 
 // --- AI CONFIGURATION ---
-// Try using gemini-2.0-flash which is more reliable
-const API_KEY = "AIzaSyDLLglF25FLGhFKH1dkeu3dhuoScScsgH0"; 
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${API_KEY}`;
+// Using Gemini API for outfit suggestions
+const API_KEY = "AIzaSyByilIrxqfciVlKWYJ_62fGWdHK8KiYQPw";
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${API_KEY}`;
+
+// Google Cloud Vision API - used to analyze clothing colors and labels
 const VISION_API_KEY = "AIzaSyCMPeCwtKUblxsE2Qrfcn-2OfLo1Ov42M0";
 const VISION_URL = `https://vision.googleapis.com/v1/images:annotate?key=${VISION_API_KEY}`;
 
-// Valid clothing labels for each category
+// Valid clothing labels for each category - expanded with more synonyms
 const CLOTHING_LABELS = {
-    shirt: ['shirt', 'top', 'blouse', 't-shirt', 'sweater', 'hoodie', 'jacket', 'coat', 'sleeve', 'outerwear', 'clothing', 'apparel', 'wear', 'dress shirt', 'polo'],
-    pants: ['pants', 'jeans', 'trousers', 'shorts', 'skirt', 'bottoms', 'denim', 'leggings', 'joggers', 'chinos'],
-    shoes: ['shoe', 'sneaker', 'boot', 'sandal', 'heel', 'footwear', 'loafer', 'slipper', 'trainer', 'running shoe'],
-    accessory: ['bag', 'purse', 'watch', 'jewelry', 'belt', 'hat', 'cap', 'scarf', 'glasses', 'sunglasses', 'necklace', 'bracelet', 'ring', 'earring', 'accessory', 'handbag', 'backpack', 'wallet']
+    shirt: ['shirt', 'top', 'blouse', 't-shirt', 'sweater', 'hoodie', 'jacket', 'coat', 'sleeve', 'outerwear', 'clothing', 'apparel', 'wear', 'dress shirt', 'polo', 'tank top', 'cardigan', 'vest', 'pullovers', 'long sleeve', 'short sleeve', 'crop top', 'halter', 'bodysuit', 'tee', 'pullover'],
+    pants: ['pants', 'jeans', 'trousers', 'shorts', 'skirt', 'bottoms', 'denim', 'leggings', 'joggers', 'chinos', 'cargo pants', 'pant', 'denim pants', 'blue jeans', ' Bermudas', 'culottes', 'capri', 'palazzo'],
+    shoes: ['shoe', 'sneaker', 'boot', 'sandal', 'heel', 'footwear', 'loafer', 'slipper', 'trainer', 'running shoe', 'kicks', 'athletic shoe', 'shoes', 'tennis shoe', 'dress shoe', 'flat', 'heels', 'pump', 'stiletto', 'wedge', 'moccasin', 'clog', 'oxford', 'high top', 'low top', 'basketball shoe', ' soccer cleat'],
+    accessory: ['bag', 'purse', 'watch', 'jewelry', 'belt', 'hat', 'cap', 'scarf', 'glasses', 'sunglasses', 'necklace', 'bracelet', 'ring', 'earring', 'accessory', 'handbag', 'backpack', 'wallet', 'wallet', 'clutch', 'tote', 'satchel', 'crossbody', 'briefcase', 'pocket watch', 'pendant', 'charm', 'brooch', ' cufflink', 'tie clip', 'beanie', 'fedora', 'beret', 'visor', 'headband', 'wrap', 'shawl', 'stole']
 };
 
-const STYLIST_PROMPT = `You are a fashion stylist analyzing real clothing items. 
+const STYLIST_PROMPT = `You are a fashion stylist. Analyze the clothing items shown in the IMAGES provided.
 
-Look at each image carefully and describe:
-- What colors do you see? 
-- What style is each item (casual, formal, sporty, etc.)?
-- How do the pieces work together?
+For EACH clothing item you see:
+- Identify the specific piece (e.g., crew neck t-shirt, skinny jeans, leather boots)
+- Describe the colors, patterns, and any prints you observe
+- Note the material/texture (appears to be cotton, denim, leather, etc.)
+- Comment on fit and silhouette (loose, fitted, oversized, cropped, etc.)
+- Assess the style level (casual, business casual, formal, sporty, trendy, etc.)
+- Evaluate the condition and quality
 
-Then give:
-- A match rating (1-10)
-- 1-2 specific suggestions to improve the outfit
+Then analyze the COMPLETE OUTFIT:
+- How do these specific pieces work together?
+- Color harmony and contrast between the items
+- Overall vibe and cohesion of the outfit
+- Rate the match (1-10 scale)
+- Provide 1-2 specific, actionable suggestions to improve this outfit
 
-Keep it short - max 3 sentences. Be honest and practical.`;
+Base your entire analysis on what you SEE in the images. Be specific about colors, styles, and details you observe.`;
 
-// --- IMAGE VALIDATION WITH AI (Using Gemini) ---
-async function validateImageWithAI(base64Image, category) {
-    const categoryLabels = CLOTHING_LABELS[category].join(', ');
-    
-    const validationPrompt = `Analyze this image and determine if it contains a clothing item that could be categorized as "${category}". 
-Valid ${category} items include: ${categoryLabels}.
-Respond with ONLY a JSON object in this exact format:
-{"valid": true/false, "reason": "brief explanation"}`;
-
+// --- IMAGE ANALYSIS WITH GOOGLE CLOUD VISION API ---
+async function analyzeImageWithVisionAPI(base64Image) {
     try {
-        const response = await fetch(GEMINI_URL, {
+        const response = await fetch(VISION_URL, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                contents: [{
-                    parts: [
-                        { text: validationPrompt },
-                        { inlineData: { mimeType: "image/jpeg", data: base64Image.split(',')[1] } }
+                requests: [{
+                    image: { content: base64Image.split(',')[1] },
+                    features: [
+                        { type: "LABEL_DETECTION", maxResults: 10 },
+                        { type: "IMAGE_PROPERTIES" },
+                        { type: "OBJECT_LOCALIZATION", maxResults: 10 }
                     ]
                 }]
             })
@@ -57,56 +60,250 @@ Respond with ONLY a JSON object in this exact format:
 
         const data = await response.json();
         
-        if (!data.candidates || !data.candidates[0].content.parts[0].text) {
+        if (data.error) {
+            console.error("Vision API Error:", data.error);
+            return null;
+        }
+        
+        const result = data.responses[0];
+        return {
+            labels: result.labelAnnotations?.map(l => l.description.toLowerCase()) || [],
+            colors: result.imagePropertiesAnnotation?.dominantColors?.colors || [],
+            objects: result.localizedObjectAnnotations?.map(o => o.name.toLowerCase()) || []
+        };
+    } catch (error) {
+        console.error("Vision API error:", error);
+        return null;
+    }
+}
+
+// --- IMAGE VALIDATION WITH GOOGLE CLOUD VISION API ---
+async function validateImageWithVisionAPI(base64Image, category) {
+    const categoryLabels = CLOTHING_LABELS[category];
+    
+    try {
+        console.log("Starting Vision API validation for category:", category);
+        
+        const response = await fetch(VISION_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                requests: [{
+                    image: { content: base64Image.split(',')[1] },
+                    features: [
+                        { type: "LABEL_DETECTION", maxResults: 20 },
+                        { type: "OBJECT_LOCALIZATION", maxResults: 10 }
+                    ]
+                }]
+            })
+        });
+
+        console.log("Vision API Response Status:", response.status);
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error("Vision API Error:", response.status, errorText);
+            return { valid: false, message: "AI validation failed. Please try again." };
+        }
+
+        const data = await response.json();
+        console.log("Vision API Response:", JSON.stringify(data).substring(0, 500));
+        
+        if (data.error) {
+            console.error("Vision API Error:", data.error);
+            return { valid: false, message: "AI error: " + data.error.message };
+        }
+
+        const result = data.responses[0];
+        if (!result) {
             return { valid: false, message: "Could not analyze image. Please try again." };
         }
 
-        // Parse Gemini's response
-        const responseText = data.candidates[0].content.parts[0].text;
-        let parsed;
+        // Get labels and objects from the response
+        const labels = result.labelAnnotations?.map(l => l.description.toLowerCase()) || [];
+        const objects = result.localizedObjectAnnotations?.map(o => o.name.toLowerCase()) || [];
         
-        try {
-            // Extract JSON from response
-            const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-            if (jsonMatch) {
-                parsed = JSON.parse(jsonMatch[0]);
-            } else {
-                // Fallback: check for "valid": true in text
-                parsed = { valid: responseText.toLowerCase().includes('"valid": true') || responseText.toLowerCase().includes('valid: true') };
+        console.log("Detected labels:", labels);
+        console.log("Detected objects:", objects);
+        
+        // Strict category validation with positive and negative matching
+        const categoryRules = {
+            shirt: {
+                positive: ['shirt', 'top', 'blouse', 't-shirt', 'tshirt', 'sweater', 'hoodie', 'jacket', 'cardigan', 'vest', 'tee', 'pullover', 'sleeve', 'outerwear', 'dress shirt', 'polo', 'tank', 'bodysuitsuit'],
+                negative: ['shoe', 'boot', 'sandal', 'sneaker', 'pant', 'jean', 'short', 'sock', 'bag', 'purse', 'hat', 'cap', 'watch', 'belt', 'jewelry']
+            },
+            pants: {
+                positive: ['pant', 'jean', 'trouser', 'short', 'skirt', 'bottom', 'denim', 'legging', 'jogger', 'chino', 'cargo', 'bermuda', 'capri'],
+                negative: ['shoe', 'boot', 'shirt', 'top', 'blouse', 'jacket', 'coat', 'sweater', 'bag', 'purse', 'hat', 'watch']
+            },
+            shoes: {
+                positive: ['shoe', 'sneaker', 'boot', 'sandal', 'heel', 'footwear', 'loafer', 'slipper', 'trainer', 'athletic shoe', 'kick', 'pump', 'oxford', 'slipper', 'tennis shoe', 'clog'],
+                negative: ['shirt', 'top', 'blouse', 'pant', 'jean', 'short', 'bag', 'hat', 'watch', 'jewelry', 'coat']
+            },
+            accessory: {
+                positive: ['bag', 'purse', 'watch', 'jewelry', 'belt', 'hat', 'cap', 'scarf', 'glass', 'sunglasses', 'necklace', 'bracelet', 'ring', 'earring', 'handbag', 'backpack', 'wallet'],
+                negative: ['shirt', 'top', 'blouse', 'pant', 'jean', 'shoe', 'boot', 'coat', 'jacket']
             }
-        } catch (e) {
-            parsed = { valid: responseText.toLowerCase().includes('true') };
+        };
+        
+        const rules = categoryRules[category];
+        const allDetected = [...labels, ...objects];
+        
+        // Check for negative matches (should NOT be present)
+        const hasNegativeMatch = allDetected.some(detected =>
+            rules.negative.some(neg => detected.includes(neg))
+        );
+        
+        // Check for positive matches (should be present)
+        const positiveMatches = allDetected.filter(detected =>
+            rules.positive.some(pos => detected.includes(pos))
+        );
+        
+        console.log("Negative matches:", hasNegativeMatch, "Positive matches:", positiveMatches);
+        
+        if (hasNegativeMatch) {
+            return { 
+                valid: false, 
+                message: `This doesn't appear to be a ${category}. Detected: ${labels.slice(0, 3).join(', ')}` 
+            };
         }
-
-        if (!parsed.valid) {
-            return { valid: false, message: parsed.reason || `This doesn't appear to be ${category}. Please upload a ${category} image.` };
+        
+        if (positiveMatches.length > 0) {
+            return { valid: true, message: "Valid " + category };
+        } else {
+            return { 
+                valid: false, 
+                message: `This doesn't appear to be a ${category}. Detected: ${labels.slice(0, 3).join(', ')}` 
+            };
         }
-
-        return { valid: true };
     } catch (error) {
-        console.error("Image validation error:", error);
-        // Allow upload if validation fails
-        return { valid: true, message: "Validation skipped" };
+        console.error("Vision API validation error:", error);
+        return { valid: false, message: "Could not analyze image. Please check your internet connection." };
+    }
+}
+
+// Also keep Gemini for reference (can be enabled if needed)
+// async function validateImageWithAI(base64Image, category) { ... }
+
+// --- AI OUTFIT SUGGESTION ---
+async function checkOutfit() {
+    const messageDiv = document.getElementById('resultMessage');
+    const favBtn = document.getElementById('saveFavBtn');
+    
+    if (!setOccasionFromInput()) {
+        messageDiv.innerHTML = '';
+        return;
+    }
+    
+    const user = getCurrentUser();
+    
+    favBtn.classList.add('hidden');
+    messageDiv.innerHTML = `<span class="loading-ai">Getting AI suggestions...</span>`;
+    
+    try {
+        const snapshot = await db.collection('users').doc(user.uid).collection('outfits').get();
+        
+        if (snapshot.empty) {
+            showToast("No clothes in wardrobe!", "error");
+            return;
+        }
+        
+        const wardrobe = { shirt: [], pants: [], shoes: [], accessory: [] };
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            if (data.category && wardrobe[data.category]) {
+                wardrobe[data.category].push({ image: data.image, id: doc.id });
+            }
+        });
+        
+        if (wardrobe.shirt.length === 0 && wardrobe.pants.length === 0) {
+            showToast("Add some clothes first!", "error");
+            return;
+        }
+        
+        const randomOutfit = {};
+        const icons = { shirt: '👕', pants: '👖', shoes: '👟', accessory: '💍' };
+        
+        for (const category of ['shirt', 'pants', 'shoes', 'accessory']) {
+            if (wardrobe[category].length > 0) {
+                const randomItem = wardrobe[category][Math.floor(Math.random() * wardrobe[category].length)];
+                randomOutfit[category] = randomItem.image;
+                const previewEl = document.getElementById('preview' + category.charAt(0).toUpperCase() + category.slice(1));
+                if (previewEl) {
+                    previewEl.innerHTML = `<img src="${randomItem.image}">`;
+                }
+            } else {
+                const previewEl = document.getElementById('preview' + category.charAt(0).toUpperCase() + category.slice(1));
+                if (previewEl) {
+                    previewEl.innerHTML = `<span class="silhouette">${icons[category]}</span>`;
+                }
+            }
+        }
+        
+        messageDiv.innerHTML = `<span class="loading-ai">Analyzing outfit for ${currentOccasion}...</span>`;
+        
+        const parts = [{ text: `${STYLIST_PROMPT} Context: The user is dressing for a ${currentOccasion} occasion.` }];
+        
+        for (const [type, base64Data] of Object.entries(randomOutfit)) {
+            if (base64Data) {
+                parts.push({ inlineData: { mimeType: "image/jpeg", data: base64Data.split(',')[1] } });
+            }
+        }
+
+        const response = await fetch(GEMINI_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts }] })
+        });
+
+        const data = await response.json();
+        console.log("Full Gemini Response:", JSON.stringify(data, null, 2));
+        
+        if (data.error) {
+            console.error("Gemini API Error:", data.error);
+            throw new Error(`API Error: ${data.error.message}`);
+        }
+        
+        if (!data.candidates || !data.candidates[0]) {
+            console.error("No candidates in response:", data);
+            throw new Error("No response from Gemini API");
+        }
+        
+        const aiResponse = data.candidates[0]?.content?.parts?.[0]?.text;
+        
+        if (!aiResponse) {
+            console.error("No text in response:", data.candidates[0]);
+            throw new Error("Empty response from AI");
+        }
+        
+        messageDiv.textContent = aiResponse;
+        Object.assign(outfitImages, randomOutfit);
+        favBtn.classList.remove('hidden');
+        showToast("Style advice ready!");
+    } catch (error) {
+        console.error("AI Error Details:", error);
+        messageDiv.innerHTML = `<span style="color: #e74c3c;">⚠️ ${error.message}</span>`;
+        showToast("Error: " + error.message, "error");
     }
 }
 
 // --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     checkAuth();
-    // Load Dark Mode Preference
     if (localStorage.getItem('fitcheck_theme') === 'dark') {
         document.documentElement.setAttribute('data-theme', 'dark');
     }
-    // Menu dropdown toggle
     const menuBtn = document.getElementById('menuBtn');
     const userDropdown = document.getElementById('userDropdown');
-    menuBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        userDropdown.classList.toggle('active');
-    });
-    document.addEventListener('click', () => {
-        userDropdown.classList.remove('active');
-    });
+    if (menuBtn && userDropdown) {
+        menuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            userDropdown.classList.toggle('active');
+        });
+        document.addEventListener('click', () => {
+            userDropdown.classList.remove('active');
+        });
+    }
 });
 
 // --- THEME & UI FUNCTIONS ---
@@ -127,7 +324,6 @@ function setOccasionFromInput() {
     const input = document.getElementById('vibeInput');
     const value = input.value.trim();
     
-    // List of valid occasions to check against
     const validOccasions = [
         'casual', 'work', 'business', 'formal', 'date', 'date night', 'party', 'gym', 'workout',
         'sports', 'wedding', 'interview', 'school', 'college', 'meeting', 'dinner', 'lunch',
@@ -136,7 +332,6 @@ function setOccasionFromInput() {
         'thanksgiving', 'new year', 'prom', 'graduation', 'seminar', 'conference', 'presentation'
     ];
     
-    // Check if input is valid or empty
     if (value === '') {
         showToast('Please enter a vibe (e.g., Party, Work, Date Night)', 'error');
         return false;
@@ -156,112 +351,6 @@ function filterWardrobe() {
         const name = card.querySelector('.remove-item-name').textContent.toLowerCase();
         card.style.display = name.includes(query) ? 'block' : 'none';
     });
-}
-
-// --- AI OUTFIT SUGGESTION ---
-async function checkOutfit() {
-    const messageDiv = document.getElementById('resultMessage');
-    const favBtn = document.getElementById('saveFavBtn');
-    
-    // Validate vibe input first
-    if (!setOccasionFromInput()) {
-        messageDiv.innerHTML = '';
-        return;
-    }
-    
-    const user = getCurrentUser();
-    
-    // Show loading
-    favBtn.classList.add('hidden');
-    messageDiv.innerHTML = `<span class="loading-ai">Creating random outfit...</span>`;
-    
-    try {
-        // Fetch ALL items from wardrobe
-        const snapshot = await db.collection('users').doc(user.uid).collection('outfits').get();
-        
-        if (snapshot.empty) {
-            showToast("No clothes in wardrobe!", "error");
-            return;
-        }
-        
-        // Organize items by category
-        const wardrobe = { shirt: [], pants: [], shoes: [], accessory: [] };
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.category && wardrobe[data.category]) {
-                wardrobe[data.category].push({ image: data.image, id: doc.id });
-            }
-        });
-        
-        // Check if we have enough items
-        if (wardrobe.shirt.length === 0 && wardrobe.pants.length === 0) {
-            showToast("Add some clothes first!", "error");
-            return;
-        }
-        
-        // Randomly pick one item from each category
-        const randomOutfit = {};
-        const icons = { shirt: '👕', pants: '👖', shoes: '👟', accessory: '💍' };
-        
-        for (const category of ['shirt', 'pants', 'shoes', 'accessory']) {
-            if (wardrobe[category].length > 0) {
-                const randomItem = wardrobe[category][Math.floor(Math.random() * wardrobe[category].length)];
-                randomOutfit[category] = randomItem.image;
-                // Update preview
-                const previewEl = document.getElementById('preview' + category.charAt(0).toUpperCase() + category.slice(1));
-                if (previewEl) {
-                    previewEl.innerHTML = `<img src="${randomItem.image}">`;
-                }
-            } else {
-                // Show silhouette if no items
-                const previewEl = document.getElementById('preview' + category.charAt(0).toUpperCase() + category.slice(1));
-                if (previewEl) {
-                    previewEl.innerHTML = `<span class="silhouette">${icons[category]}</span>`;
-                }
-            }
-        }
-        
-        // Now get AI advice
-        messageDiv.innerHTML = `<span class="loading-ai">Styling for ${currentOccasion}...</span>`;
-        
-        const parts = [{ text: `${STYLIST_PROMPT} Context: The user is dressing for a ${currentOccasion} occasion.` }];
-        for (const [type, base64Data] of Object.entries(randomOutfit)) {
-            if (base64Data) {
-                parts.push({ inlineData: { mimeType: "image/jpeg", data: base64Data.split(',')[1] } });
-            }
-        }
-
-        const response = await fetch(GEMINI_URL, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ contents: [{ parts }] })
-        });
-
-        const data = await response.json();
-        
-        if (data.error) {
-            throw new Error(data.error.message);
-        }
-        
-        if (data.candidates && data.candidates[0].content.parts[0].text) {
-            messageDiv.textContent = data.candidates[0].content.parts[0].text;
-            // Save the random outfit for favorites
-            Object.assign(outfitImages, randomOutfit);
-            favBtn.classList.remove('hidden');
-            showToast("Style advice ready!");
-        }
-    } catch (error) {
-        console.log("AI error, using fallback:", error);
-        const suggestions = {
-            'Casual': "This casual combo looks relaxed and comfortable! Pro-tip: Roll up your sleeves for a more polished vibe.",
-            'Work': "Professional and sharp! Pro-tip: Add a watch to elevate this work-ready look.",
-            'Date Night': "Date night glam! Pro-tip: Accessorize with subtle jewelry to complete the look.",
-            'Gym': "Ready to crush your workout! Pro-tip: Make sure your sneakers match your activity."
-        };
-        messageDiv.textContent = suggestions[currentOccasion] || suggestions['Casual'];
-        favBtn.classList.remove('hidden');
-        showToast("Style advice ready!");
-    }
 }
 
 // --- SAVE FAVORITE ---
@@ -291,10 +380,20 @@ function showToast(message, type = 'success') {
 async function handleImageUpload(input, type) {
     const file = input.files[0];
     if (!file) return;
+    
     const reader = new FileReader();
-    reader.onload = (e) => {
-        tempUploadData = { base64Image: e.target.result, type };
-        document.getElementById('modalImagePreview').innerHTML = `<img src="${e.target.result}">`;
+    reader.onload = async (e) => {
+        const base64Image = e.target.result;
+        
+        // Skip AI validation for now - allow uploads directly
+        // Validation can be enabled later after fixing API issues
+        
+        // Get Vision API analysis for color detection (optional)
+        const visionData = await analyzeImageWithVisionAPI(base64Image);
+        console.log("Vision API Analysis:", visionData);
+        
+        tempUploadData = { base64Image, type, visionData };
+        document.getElementById('modalImagePreview').innerHTML = `<img src="${base64Image}">`;
         document.getElementById('detailsModal').classList.remove('hidden');
     };
     reader.readAsDataURL(file);
@@ -303,7 +402,6 @@ async function handleImageUpload(input, type) {
 document.getElementById('saveDetailsBtn').onclick = async function() {
     const user = getCurrentUser();
     
-    // Check if image was selected
     if (!tempUploadData || !tempUploadData.base64Image) {
         showToast("Please select an image first!", "error");
         return;
@@ -316,25 +414,33 @@ document.getElementById('saveDetailsBtn').onclick = async function() {
     try {
         this.textContent = "Uploading...";
         
-        // Save to wardrobe collection
+        let detectedColors = [];
+        if (tempUploadData.visionData && tempUploadData.visionData.colors) {
+            detectedColors = tempUploadData.visionData.colors.slice(0, 3).map(c => {
+                const r = c.color.red || 0;
+                const g = c.color.green || 0;
+                const b = c.color.blue || 0;
+                return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
+            });
+        }
+        
         await db.collection('users').doc(user.uid).collection('outfits').add({
             image: tempUploadData.base64Image,
             category: tempUploadData.type,
-            name, color,
+            name, 
+            color,
             description: document.getElementById('itemDescription').value.trim(),
+            detectedColors: detectedColors,
             uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
         });
         
-        // Save to current outfit - use set with merge to ensure it works
         const currentRef = db.collection('users').doc(user.uid).collection('outfits').doc('current');
         await currentRef.set({
             [tempUploadData.type]: tempUploadData.base64Image
         }, { merge: true });
         
-        // Update local state
         outfitImages[tempUploadData.type] = tempUploadData.base64Image;
         
-        // Update preview
         const previewEl = document.getElementById('preview' + tempUploadData.type.charAt(0).toUpperCase() + tempUploadData.type.slice(1));
         if (previewEl) {
             previewEl.innerHTML = `<img src="${tempUploadData.base64Image}">`;
@@ -360,15 +466,10 @@ function closeUploadSection() { document.getElementById('uploadSection').classLi
 function closeDetailsModal() { document.getElementById('detailsModal').classList.add('hidden'); tempUploadData = null; }
 function closeRemoveSection() { document.getElementById('removeCategorySection').classList.add('hidden'); document.getElementById('removeItemsSection').classList.add('hidden'); }
 
-// --- FAVORITES ---
 function showFavorites() {
-    // Close dropdown first
     document.getElementById('userDropdown').classList.remove('active');
-    
     const grid = document.getElementById('favoritesGrid');
     grid.innerHTML = 'Loading...';
-    
-    // Hide other sections
     hideOtherSections('favoritesSection');
     document.getElementById('favoritesSection').classList.remove('hidden');
     
@@ -405,15 +506,11 @@ async function deleteFavorite(favId) {
     try {
         await db.collection('users').doc(user.uid).collection('favorites').doc(favId).delete();
         showToast("Favorite removed!");
-        showFavorites(); // Refresh the list
-    } catch (e) {
-        showToast("Error removing favorite", "error");
-    }
+        showFavorites();
+    } catch (e) { showToast("Error removing favorite", "error"); }
 }
 
-function closeFavorites() {
-    document.getElementById('favoritesSection').classList.add('hidden');
-}
+function closeFavorites() { document.getElementById('favoritesSection').classList.add('hidden'); }
 
 async function showRemoveItems(category) {
     const user = getCurrentUser();
@@ -461,14 +558,9 @@ async function loadOutfits() {
     }
 }
 
-// --- RANDOMIZED GREETING ---
-const greetings = [
-    "Hey", "Hi", "What's up", "Good to see you", "Welcome back", "Looking good"
-];
+const greetings = ["Hey", "Hi", "What's up", "Good to see you", "Welcome back", "Looking good"];
 
-function getRandomGreeting() {
-    return greetings[Math.floor(Math.random() * greetings.length)];
-}
+function getRandomGreeting() { return greetings[Math.floor(Math.random() * greetings.length)]; }
 
 function checkAuth() {
     auth.onAuthStateChanged(u => {
@@ -477,7 +569,6 @@ function checkAuth() {
             document.getElementById('header').classList.remove('hidden');
             document.getElementById('mainContent').classList.remove('hidden');
             document.getElementById('authRequired').classList.add('hidden');
-            // Update user name in greeting and dropdown
             const userName = user ? user.name : 'User';
             const greeting = getRandomGreeting();
             document.getElementById('greetingText').textContent = greeting + ', ' + userName;

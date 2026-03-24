@@ -347,6 +347,7 @@ main {
     align-items: center;
     width: 100%;
     margin-top: 1.5rem;
+    position: relative;
 }
 
 .btn-primary {
@@ -354,6 +355,13 @@ main {
     color: var(--bg);
     width: 50%;
     font-size: 0.95rem;
+}
+
+.action-container .fav-btn {
+    position: absolute;
+    right: 10%;
+    top: 0;
+    transform: none;
 }
 
 .button-row {
@@ -382,11 +390,13 @@ main {
     width: 100%;
     position: relative;
     margin-top: 1rem;
+    
 }
 
 .result-message {
     padding: 1.2rem;
     background: var(--item-bg);
+    background: rgba(201, 201, 201, 0.7);
     border-radius: 16px;
     font-size: 0.85rem;
     line-height: 1.6;
@@ -397,17 +407,21 @@ main {
 }
 
 .fav-btn {
-    position: absolute;
-    right: 10px;
-    bottom: 10px;
     background: none;
     border: none;
-    font-size: 1.2rem;
+    font-size: 1.5rem;
     cursor: pointer;
     transition: transform 0.2s;
+    padding: 0.5rem;
 }
 
-.fav-btn:hover { transform: scale(1.2); }
+.fav-btn.hidden { 
+    visibility: hidden; 
+}
+
+.fav-btn:hover { 
+    transform: scale(1.2); 
+}
 
 /* --- SEARCH BAR --- */
 .search-container { margin: 1rem 0; }
