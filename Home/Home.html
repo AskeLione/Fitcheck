@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FitCheck — Your Digital Closet</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div id="toast" class="toast hidden"></div>
+
+    <div id="confirmModal" class="confirm-modal hidden">
+        <div class="confirm-content">
+            <h3 style="margin-bottom: 10px;">Remove this piece?</h3>
+            <p style="color: #666; font-size: 0.9rem;">This will permanently delete the item from your digital closet.</p>
+            <div class="confirm-btns">
+                <button class="btn btn-secondary" onclick="closeConfirmModal()">Keep it</button>
+                <button class="btn btn-primary" style="background: #e74c3c;" id="finalDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <header id="header" class="hidden">
+        <div class="logo">fitcheck</div>
+        <div class="user-menu">
+            <span class="greeting" id="greetingText">Hello, User</span>
+            <button class="menu-trigger" id="menuBtn">
+                <span class="hamburger">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </span>
+            </button>
+            <div class="dropdown-menu" id="userDropdown">
+                <div class="dropdown-header">
+                    <span class="dropdown-name" id="displayUserName">User</span>
+                </div>
+                <div class="dropdown-divider"></div>
+<button class="dropdown-item" onclick="showFavorites()">
+                    <span class="dropdown-icon">❤️</span> Favorites
+                </button>
+                <button class="dropdown-item" onclick="toggleTheme()">
+                    <span class="dropdown-icon">🌓</span> Dark Mode
+                </button>
+                <button class="dropdown-item" onclick="logout()">
+                    <span class="dropdown-icon">🚪</span> Logout
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main id="mainContent" class="hidden">
+        <div class="welcome">
+            <h1>Style, Simplified.</h1>
+            <p>Combine your pieces and visualize your next look.</p>
+        </div>
+
+        <div class="occasion-selector">
+            <p class="section-label">THE VIBE</p>
+            <input type="text" id="vibeInput" class="vibe-input" placeholder="e.g., Casual, Party, Business, Date Night..." oninput="setOccasionFromInput()">
+        </div>
+
+        <div class="outfit-preview">
+            <div class="outfit-grid">
+                <div class="outfit-item" id="previewShirt"><span class="silhouette">👕</span></div>
+                <div class="outfit-item" id="previewPants"><span class="silhouette">👖</span></div>
+                <div class="outfit-item" id="previewShoes"><span class="silhouette">👟</span></div>
+                <div class="outfit-item" id="previewAccessory"><span class="silhouette">💍</span></div>
+            </div> 
+            
+            <div class="action-container">
+                <button class="btn btn-primary" onclick="checkOutfit()">Suggest Outfit</button>
+                <div class="result-container">
+                    <div class="result-message" id="resultMessage"></div>
+                    <button id="saveFavBtn" class="fav-btn hidden" onclick="saveFavorite()" title="Save to Favorites">❤️</button>
+                </div>
+            </div>
+        </div> 
+
+        <div class="button-row">
+            <button class="btn btn-secondary" onclick="showUploadSection()">+ Add New Piece</button>
+            <button class="btn btn-secondary" onclick="showRemoveCategory()">- Manage Wardrobe</button>
+        </div>
+
+        <div class="remove-section hidden" id="removeCategorySection">
+            <h2>Manage Wardrobe</h2>
+            <div class="clothing-categories">
+                <div class="clothing-item" onclick="showRemoveItems('shirt')"><div class="silhouette">👕</div><div class="label">Tops</div></div>
+                <div class="clothing-item" onclick="showRemoveItems('pants')"><div class="silhouette">👖</div><div class="label">Bottoms</div></div>
+                <div class="clothing-item" onclick="showRemoveItems('shoes')"><div class="silhouette">👟</div><div class="label">Kicks</div></div>
+                <div class="clothing-item" onclick="showRemoveItems('accessory')"><div class="silhouette">🎒</div><div class="label">Blings</div></div>
+            </div>
+            <button class="btn btn-cancel" onclick="closeRemoveSection()" style="width: 100%">Cancel</button>
+        </div>
+
+        <div class="upload-section hidden" id="uploadSection">
+            <h2>Add to Wardrobe</h2>
+            <div class="clothing-categories">
+                <div class="clothing-item" onclick="document.getElementById('shirtInput').click()">
+                    <input type="file" id="shirtInput" style="display:none" accept="image/*" onchange="handleImageUpload(this, 'shirt')">
+                    <div class="silhouette">👕</div><div class="label">Top</div>
+                </div>
+                <div class="clothing-item" onclick="document.getElementById('pantsInput').click()">
+                    <input type="file" id="pantsInput" style="display:none" accept="image/*" onchange="handleImageUpload(this, 'pants')">
+                    <div class="silhouette">👖</div><div class="label">Bottom</div>
+                </div>
+                <div class="clothing-item" onclick="document.getElementById('shoesInput').click()">
+                    <input type="file" id="shoesInput" style="display:none" accept="image/*" onchange="handleImageUpload(this, 'shoes')">
+                    <div class="silhouette">👟</div><div class="label">Kicks</div>
+                </div>
+                <div class="clothing-item" onclick="document.getElementById('accessoryInput').click()">
+                    <input type="file" id="accessoryInput" style="display:none" accept="image/*" onchange="handleImageUpload(this, 'accessory')">
+                    <div class="silhouette">🎒</div><div class="label">Blings</div>
+                </div>
+            </div>
+            <button class="btn btn-cancel" style="width: 100%" onclick="closeUploadSection()">Finish</button>
+        </div>
+
+<div class="remove-items-section hidden" id="removeItemsSection">
+            <h2 id="removeCategoryTitle">Items</h2>
+            <div class="remove-items-grid" id="removeItemsGrid"></div>
+            <div class="modal-footer" style="display:flex; gap:10px; margin-top:20px;">
+                <button class="btn btn-secondary" style="flex:1" onclick="showRemoveCategory()">Back</button>
+                <button class="btn btn-secondary" style="flex:1" onclick="closeRemoveSection()">Close</button>
+            </div>
+        </div>
+
+        <!-- Favorites Section -->
+        <div class="favorites-section hidden" id="favoritesSection">
+            <h2>❤️ Your Favorites</h2>
+            <div class="favorites-grid" id="favoritesGrid"></div>
+            <button class="btn btn-cancel" onclick="closeFavorites()" style="width: 100%; margin-top: 20px;">Close</button>
+        </div>
+    </main>
+
+    <div id="detailsModal" class="details-modal hidden">
+        <div class="details-content">
+            <h3>New Piece Details</h3>
+            <div id="modalImagePreview" class="modal-preview"></div>
+            <label>NAME *</label>
+            <input type="text" id="itemName" placeholder="e.g., Oversized Black Hoodie">
+            <label>COLOR *</label>
+            <input type="text" id="itemColor" placeholder="e.g., Charcoal Gray">
+            <label>DESCRIPTION</label>
+            <textarea id="itemDescription" placeholder="Materials, fit, or brand..."></textarea>
+            <div class="details-actions">
+                <button class="btn btn-primary" id="saveDetailsBtn">Add to Closet</button>
+                <button class="btn btn-cancel" onclick="closeDetailsModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="authRequired" class="auth-required">
+        <h1>fitcheck</h1>
+        <p>Login to begin curating your digital closet.</p>
+        <a href="../Login/index.html" class="login-btn">Get Started</a>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore-compat.js"></script>
+    <script src="firebase.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

@@ -85,7 +85,7 @@ showLoginFromForgot.addEventListener('click', (e) => {
 });
 
 successButton.addEventListener('click', () => {
-    window.location.href = '../Home/index.html';
+    window.location.href = '../Home/Home.html';
 });
 
 errorButton.addEventListener('click', () => {
@@ -127,7 +127,7 @@ loginForm.addEventListener('submit', async (e) => {
                 sessionStorage.setItem('fitcheck_current_user', JSON.stringify(userInfo));
             }
             
-            window.location.href = '../Home/index.html';
+            window.location.href = '../Home/Home.html';
         } else {
             showError('User data not found');
         }
@@ -222,7 +222,7 @@ signupForm.addEventListener('submit', async (e) => {
         
         setCurrentUser(userInfo);
         
-        window.location.href = '../Home/index.html';
+        window.location.href = '../Home/Home.html';
     } catch (error) {
         console.error('Signup error:', error);
         if (error.code === 'auth/email-already-in-use') {
