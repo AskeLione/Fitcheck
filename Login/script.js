@@ -1,285 +1,209 @@
-// DOM Elements
-const loginForm = document.getElementById('loginForm');
-const signupForm = document.getElementById('signupForm');
-const forgotPasswordForm = document.getElementById('forgotPasswordForm');
-const showSignup = document.getElementById('showSignup');
-const showLogin = document.getElementById('showLogin');
-const showForgotPassword = document.getElementById('showForgotPassword');
-const showLoginFromForgot = document.getElementById('showLoginFromForgot');
-const successMessage = document.getElementById('successMessage');
-const errorMessage = document.getElementById('errorMessage');
-const successText = document.getElementById('successText');
-const errorText = document.getElementById('errorText');
-const successButton = document.getElementById('successButton');
-const errorButton = document.getElementById('errorButton');
+document.addEventListener('DOMContentLoaded', async () => {
+  console.log('Login script loaded');
 
-// Utility Functions
-function showSuccess(message) {
+  // Import shared Supabase client & await initialization
+  const { supabase, supabaseAuth } = await import('./supabase.js');
+  const authClient = await supabaseAuth;
+  const dbClient = await supabase;
+  console.log('Supabase clients ready:', authClient, dbClient);
+
+  // DOM Elements
+  const loginForm = document.getElementById('loginForm');
+  const signupForm = document.getElementById('signupForm');
+  const forgotPasswordForm = document.getElementById('forgotPasswordForm');
+  const showSignup = document.getElementById('showSignup');
+  const showLogin = document.getElementById('showLogin');
+  const showForgotPassword = document.getElementById('showForgotPassword');
+  const showLoginFromForgot = document.getElementById('showLoginFromForgot');
+  const successMessage = document.getElementById('successMessage');
+  const errorMessage = document.getElementById('errorMessage');
+  const successText = document.getElementById('successText');
+  const errorText = document.getElementById('errorText');
+  const successButton = document.getElementById('successButton');
+  const errorButton = document.getElementById('errorButton');
+
+  // Utility Functions
+  function showSuccess(message) {
     hideAll();
     successText.textContent = message;
     successMessage.classList.remove('hidden');
-}
+  }
 
-function showError(message) {
+  function showError(message) {
     hideAll();
     errorText.textContent = message;
     errorMessage.classList.remove('hidden');
-}
+  }
 
-function hideAll() {
-    loginForm.classList.add('hidden');
-    signupForm.classList.add('hidden');
-    forgotPasswordForm.classList.add('hidden');
-    successMessage.classList.add('hidden');
-    errorMessage.classList.add('hidden');
-}
+  function hideAll() {
+    const forms = ['loginForm', 'signupForm', 'forgotPasswordForm', 'successMessage', 'errorMessage'];
+    forms.forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.classList.add('hidden');
+    });
+  }
 
-function showLoginForm() {
+  function showLoginForm() {
     hideAll();
     loginForm.classList.remove('hidden');
-}
+  }
 
-function showSignupForm() {
+  function showSignupForm() {
     hideAll();
     signupForm.classList.remove('hidden');
-}
+  }
 
-function showForgotPasswordForm() {
+  function showForgotPasswordForm() {
     hideAll();
     forgotPasswordForm.classList.remove('hidden');
-}
+  }
 
-// Store user session locally for app access
-function setCurrentUser(user) {
+  // Local storage utils
+  function setCurrentUser(user) {
     localStorage.setItem('fitcheck_current_user', JSON.stringify(user));
-}
+  }
 
-function getCurrentUser() {
-    const user = localStorage.getItem('fitcheck_current_user');
-    return user ? JSON.parse(user) : null;
-}
+  function getCurrentUser() {
+    try {
+      return JSON.parse(localStorage.getItem('fitcheck_current_user') || 'null');
+    } catch {
+      return null;
+    }
+  }
 
-function clearCurrentUser() {
-    localStorage.removeItem('fitcheck_current_user');
-}
-
-// Event Listeners
-showSignup.addEventListener('click', (e) => {
+  // Toggle events
+  showSignup?.addEventListener('click', (e) => {
     e.preventDefault();
     showSignupForm();
-});
-
-showLogin.addEventListener('click', (e) => {
+  });
+  showLogin?.addEventListener('click', (e) => {
     e.preventDefault();
     showLoginForm();
-});
-
-showForgotPassword.addEventListener('click', (e) => {
+  });
+  showForgotPassword?.addEventListener('click', (e) => {
     e.preventDefault();
     showForgotPasswordForm();
-});
-
-showLoginFromForgot.addEventListener('click', (e) => {
+  });
+  showLoginFromForgot?.addEventListener('click', (e) => {
     e.preventDefault();
     showLoginForm();
-});
-
-successButton.addEventListener('click', () => {
+  });
+  successButton?.addEventListener('click', () => {
     window.location.href = '../Home/Home.html';
-});
-
-errorButton.addEventListener('click', () => {
+  });
+  errorButton?.addEventListener('click', () => {
     showLoginForm();
-});
+  });
 
-// Handle Login with Firebase
-loginForm.addEventListener('submit', async (e) => {
+  // LOGIN
+  loginForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
-    const rememberMe = document.getElementById('rememberMe').checked;
 
     if (!email || !password) {
-        showError('Please fill in all fields');
-        return;
+      showError('Please fill in all fields');
+      return;
     }
 
     try {
-        // Sign in with Firebase
-        const userCredential = await auth.signInWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-        
-        // Get user data from Firestore
-        const userDoc = await db.collection('users').doc(user.uid).get();
-        
-        if (userDoc.exists) {
-            const userData = userDoc.data();
-            const userInfo = {
-                uid: user.uid,
-                name: userData.name,
-                email: user.email
-            };
-            
-            if (rememberMe) {
-                setCurrentUser(userInfo);
-            } else {
-                sessionStorage.setItem('fitcheck_current_user', JSON.stringify(userInfo));
-            }
-            
-            window.location.href = '../Home/Home.html';
-        } else {
-            showError('User data not found');
-        }
+      console.log('Login attempt:', email);
+      const { data: { user }, error } = await authClient.signInWithPassword({ email, password });
+      if (error) throw error;
+
+      const { data: userData } = await dbClient.from('profiles').select('*').eq('id', user.id).single().catch(() => ({}));
+
+      const userInfo = {
+        uid: user.id,
+        name: userData?.name || user.email.split('@')[0],
+        email: user.email
+      };
+
+      setCurrentUser(userInfo);
+      window.location.href = '../Home/Home.html';
     } catch (error) {
-        console.error('Login error:', error);
-        if (error.code === 'auth/invalid-email') {
-            showError('Invalid email address');
-        } else if (error.code === 'auth/user-not-found') {
-            showError('No account found with this email');
-        } else if (error.code === 'auth/wrong-password') {
-            showError('Incorrect password');
-        } else {
-            showError('Login failed: ' + error.message);
-        }
+      console.error('Login error:', error);
+      let msg = error.message;
+      if (error.code === 'auth/invalid-email') msg = 'Invalid email';
+      else if (error.code === 'auth/wrong-password') msg = 'Incorrect password';
+      showError(msg);
     }
-});
+  });
 
-// Handle Forgot Password
-forgotPasswordForm.addEventListener('submit', async (e) => {
+  // SIGNUP
+  signupForm?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    
-    const email = document.getElementById('forgotEmail').value.trim();
-
-    if (!email) {
-        showError('Please enter your email address');
-        return;
-    }
-
-    try {
-        // Send password reset email
-        await auth.sendPasswordResetEmail(email);
-        showSuccess('Password reset link sent! Check your email for instructions.');
-    } catch (error) {
-        console.error('Forgot password error:', error);
-        if (error.code === 'auth/invalid-email') {
-            showError('Invalid email address');
-        } else if (error.code === 'auth/user-not-found') {
-            showError('No account found with this email');
-        } else {
-            showError('Failed to send reset link: ' + error.message);
-        }
-    }
-});
-
-// Handle Signup with Firebase
-signupForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    
     const name = document.getElementById('signupName').value.trim();
     const email = document.getElementById('signupEmail').value.trim();
     const password = document.getElementById('signupPassword').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
 
     if (!name || !email || !password || !confirmPassword) {
-        showError('Please fill in all fields');
-        return;
+      showError('Please fill in all fields');
+      return;
     }
-
-    if (name.length < 2) {
-        showError('Name must be at least 2 characters');
-        return;
-    }
-
     if (password.length < 6) {
-        showError('Password must be at least 6 characters');
-        return;
+      showError('Password must be at least 6 characters');
+      return;
     }
-
     if (password !== confirmPassword) {
-        showError('Passwords do not match');
-        return;
+      showError('Passwords do not match');
+      return;
     }
 
     try {
-        // Create user with Firebase
-        const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-        const user = userCredential.user;
-        
-        // Save user data to Firestore
-        await db.collection('users').doc(user.uid).set({
-            name: name,
-            email: email,
-            createdAt: firebase.firestore.FieldValue.serverTimestamp()
-        });
-        
-        // Set current user
-        const userInfo = {
-            uid: user.uid,
-            name: name,
-            email: email
-        };
-        
-        setCurrentUser(userInfo);
-        
-        window.location.href = '../Home/Home.html';
+      console.log('Creating user:', email);
+      const { data: { user }, error } = await authClient.signUp({
+        email,
+        password,
+        options: { data: { name } }
+      });
+      if (error) throw error;
+
+      // Profile (non-blocking)
+      await dbClient.from('profiles').upsert({ id: user.id, name, email });
+
+      const userInfo = { uid: user.id, name, email };
+      setCurrentUser(userInfo);
+
+      showSuccess('Account created! Redirecting...');
+      setTimeout(() => window.location.href = '../Home/Home.html', 1500);
     } catch (error) {
-        console.error('Signup error:', error);
-        if (error.code === 'auth/email-already-in-use') {
-            showError('An account with this email already exists');
-        } else if (error.code === 'auth/invalid-email') {
-            showError('Invalid email address');
-        } else if (error.code === 'auth/weak-password') {
-            showError('Password is too weak');
-        } else {
-            showError('Signup failed: ' + error.message);
-        }
+      console.error('Signup error:', error);
+      let msg = error.message;
+      if (error.code === 'auth/email-already-in-use') msg = 'Email already registered';
+      showError(msg);
     }
+  });
+
+  // FORGOT PASSWORD
+  forgotPasswordForm?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('forgotEmail').value.trim();
+    if (!email) {
+      showError('Please enter email');
+      return;
+    }
+
+    try {
+      const { error } = await authClient.resetPasswordForEmail(email);
+      if (error) throw error;
+      showSuccess('Reset email sent!');
+    } catch (error) {
+      showError(error.message);
+    }
+  });
+
+  // Auth listener
+  authClient.onAuthStateChange((event, session) => {
+    if (session?.user && event === 'SIGNED_IN') {
+      window.location.href = '../Home/Home.html';
+    }
+  });
+
+  window.logout = async () => {
+    await authClient.signOut();
+    localStorage.removeItem('fitcheck_current_user');
+    location.reload();
+  };
 });
-
-// Check if user is already logged in
-function checkAuth() {
-    auth.onAuthStateChanged(async (firebaseUser) => {
-        if (firebaseUser) {
-            try {
-                const userDoc = await db.collection('users').doc(firebaseUser.uid).get();
-                if (userDoc.exists) {
-                    const userData = userDoc.data();
-                    const userInfo = {
-                        uid: firebaseUser.uid,
-                        name: userData.name,
-                        email: userData.email
-                    };
-                    setCurrentUser(userInfo);
-                }
-            } catch (error) {
-                console.error('Error fetching user data:', error);
-            }
-        }
-    });
-}
-
-// Initialize
-document.addEventListener('DOMContentLoaded', checkAuth);
-
-// Logout function
-window.logout = async function() {
-    try {
-        await auth.signOut();
-    } catch (error) {
-        console.error('Logout error:', error);
-    }
-    clearCurrentUser();
-    sessionStorage.removeItem('fitcheck_current_user');
-    window.location.href = '../Login/index.html';
-};
-
-// Check auth status function
-window.isAuthenticated = function() {
-    return getCurrentUser() !== null || sessionStorage.getItem('fitcheck_current_user') !== null;
-};
-
-// Get logged in user function
-window.getUser = function() {
-    return getCurrentUser() || JSON.parse(sessionStorage.getItem('fitcheck_current_user'));
-};

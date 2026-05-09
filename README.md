@@ -1,53 +1,47 @@
-# FitCheck — Your Digital Closet
+# FitCheck — AI Wardrobe Assistant (Supabase)
 
-FitCheck is a web application that allows users to manage their digital wardrobe, upload clothing items, and get outfit suggestions.
+**100% migrated from Firebase → Supabase!** No Firebase needed.
 
 ## Features
+- ✅ Auth (Email/Password)
+- ✅ Wardrobe management (upload base64 images)
+- ✅ AI outfit analysis (Gemini + Vision API)
+- ✅ Favorites & current outfits
+- ✅ Responsive UI + dark mode
 
-- User Authentication: Sign up and login using Firebase Authentication
-- Digital Wardrobe: Add clothing items (tops, bottoms, shoes, accessories) to your closet
-- Outfit Preview: Visualize how your clothes look together
-- Outfit Suggestions: Get AI-powered outfit recommendations
-- Wardrobe Management: Remove items from your closet
+## Quick Start
+```
+1. Run migrate-supabase.sql (Supabase Dashboard → SQL Editor)
+2. npx live-server .
+3. http://localhost:8080 → Login → Home
+```
 
-## Project Structure
+**Supabase Config (in lib/supabase.js):**
+```
+URL: https://dtucddjjuexgkxpuohmd.supabase.co
+Anon Key: sb_publishable_oD0b6Wm8_gSS6rDPcNE9bQ_KzhFaDKs
+```
 
-Fitcheck/
-├── index.html          # Main entry point
-├── package.json        # Node.js dependencies
-├── README.md           # This file
-├── Home/               # Home/Dashboard page
-│   ├── Home.html       # Main app interface
-│   ├── firebase.js     # Firebase configuration
-│   └── styles.css      # Home page styles
-└── Login/              # Authentication pages
-    ├── index.html      # Login page
-    ├── firebase.js     # Firebase configuration
-    ├── script.js       # Login/Signup logic
-    └── styles.css      # Login page styles
+## Schema (migrate-supabase.sql)
+```
+profiles | outfits | favorites | current_outfits
+Full RLS | Base64 images | JSON outfits | Active outfit
+```
 
-## Technology Stack
+## Tech
+- **Frontend**: HTML/JS/CSS (Vanilla + Supabase CDN)
+- **Backend**: Supabase (Auth + Postgres)
+- **AI**: Gemini 1.5 Flash + Google Vision
 
-- Frontend: HTML, CSS, JavaScript
-- Backend: Firebase (Authentication, Firestore)
-- Storage: Firebase Firestore for data persistence
+## Test Flow
+1. Signup/Login
+2. Upload clothes (shirt/pants/shoes/accessory)
+3. \"Suggest Outfit\" → AI advice
+4. Save favorite
+5. Logout/Login → Data persists
 
-## Getting Started
+**No npm install needed! Pure browser app.**
 
-1. Clone the repository
-2. Install dependencies: npm install
-3. Set up Firebase at firebase.google.com - Enable Authentication (Email/Password) and Firestore Database
-4. Copy your Firebase config to firebase.js files
-5. Open index.html in a web browser
+---
+*MIT License*
 
-## Usage
-
-1. Sign Up: Create an account on the login page
-2. Add Clothes: Click "+ Add New Piece" to upload clothing images
-3. Preview Outfits: See how your items look together
-4. Get Suggestions: Click "Suggest Outfit" for recommendations
-5. Manage Wardrobe: Click "- Manage Wardrobe" to remove items
-
-## License
-
-MIT License

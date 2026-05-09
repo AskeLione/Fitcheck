@@ -1,5 +1,12 @@
 {
-  "dependencies": {
-    "firebase": "^12.10.0"
-  }
+  "name": "fitcheck",
+  "version": "1.0.0",
+  "description": "AI Wardrobe Assistant - Supabase",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx live-server .",
+    "dev": "npx live-server Home/ --open=Home/Home.html"
+  },
+  "author": "FitCheck Team",
+  "license": "MIT"
 }
