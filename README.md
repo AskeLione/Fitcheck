@@ -16,11 +16,7 @@
 3. http://localhost:8080 → Login → Home
 ```
 
-**Supabase Config (in lib/supabase.js):**
-```
-URL: https://dtucddjjuexgkxpuohmd.supabase.co
-Anon Key: sb_publishable_oD0b6Wm8_gSS6rDPcNE9bQ_KzhFaDKs
-```
+
 
 ## Schema (migrate-supabase.sql)
 ```
@@ -30,8 +26,9 @@ Full RLS | Base64 images | JSON outfits | Active outfit
 
 ## Tech
 - **Frontend**: HTML/JS/CSS (Vanilla + Supabase CDN)
-- **Backend**: Supabase (Auth + Postgres)
+- **Backend**: Supabase (Auth + Postgres) — Firebase removed
 - **AI**: Gemini 1.5 Flash + Google Vision
+
 
 ## Test Flow
 1. Signup/Login
