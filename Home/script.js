@@ -4,8 +4,9 @@
 document.addEventListener('DOMContentLoaded', async () => {
   console.log('Home script loaded');
 
-  // Import Supabase helpers
-  const { supabaseAuth, onAuthStateChange } = await import('./supabase.js');
+  // Import Supabase helpers (single source of truth)
+  const { supabaseAuth, onAuthStateChange } = await import('../lib/supabase-config.js');
+
   await supabaseAuth; // ensure init
 
   // Import the main Home logic (this file is responsible for wiring window.*)

@@ -2,7 +2,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   console.log('Login script loaded');
 
   // Import shared Supabase client & await initialization
-  const { supabase, supabaseAuth } = await import('./supabase.js');
+  const { supabase, supabaseAuth } = await import('../lib/supabase-config.js');
+
   const authClient = await supabaseAuth;
   const dbClient = await supabase;
   console.log('Supabase clients ready:', authClient, dbClient);

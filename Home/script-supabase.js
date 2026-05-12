@@ -23,7 +23,8 @@ const CLOTHING_LABELS = {
 const STYLIST_PROMPT = `You are a fashion stylist. Analyze this outfit for [OCCASION] and give styling advice.`;
 
 // --- SUPABASE IMPORTS ---
-import { supabaseDB, supabaseAuth, onAuthStateChange } from './supabase.js';
+import { supabaseDB, supabaseAuth, onAuthStateChange } from '../lib/supabase-config.js';
+
 
 function getCurrentUser() {
   return JSON.parse(localStorage.getItem('fitcheck_current_user') || '{}');
