@@ -111,7 +111,15 @@ document.addEventListener('DOMContentLoaded', async () => {
       const { data: { user }, error } = await authClient.signInWithPassword({ email, password });
       if (error) throw error;
 
-      const { data: userData } = await dbClient.from('profiles').select('*').eq('id', user.id).single().catch(() => ({}));
+      const { data: userData } = await dbClient
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+
+      // In case the profile row doesn't exist, single() may return { data: null, error: ... }
+      // Normalize to {} so downstream code doesn't crash.
+      const safeUserData = userData || {};
 
       const userInfo = {
         uid: user.id,
